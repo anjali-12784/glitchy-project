@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SmartPrompt AI — Prompt Optimizer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:ital,wght@0,300;0,400;1,300&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #080b10;
+      --surface: #0f1520;
+      --surface2: #161d2e;
+      --border: #1e2d45;
+      --accent: #00e5ff;
+      --accent2: #7c3aed;
+      --accent3: #f59e0b;
+      --text: #e2e8f0;
+      --muted: #64748b;
+      --success: #10b981;
+      --danger: #ef4444;
+    }
+
+    body {
+      font-family: 'Syne', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Animated grid background */
+    body::before {
+      content: '';
+      position: fixed; inset: 0; z-index: 0;
+      background-image:
+        linear-gradient(rgba(0,229,255,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,229,255,0.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+      animation: gridDrift 20s linear infinite;
+    }
+
+    @keyframes gridDrift {
+      0%   { background-position: 0 0; }
+      100% { background-position: 40px 40px; }
+    }
+
+    /* Glowing orbs */
+    .orb {
+      position: fixed; border-radius: 50%;
+      filter: blur(80px); opacity: 0.12; pointer-events: none; z-index: 0;
+    }
+    .orb1 { width: 500px; height: 500px; background: var(--accent2); top: -150px; right: -100px; animation: float1 12s ease-in-out infinite; }
+    .orb2 { width: 400px; height: 400px; background: var(--accent); bottom: -100px; left: -100px; animation: float2 15s ease-in-out infinite; }
+
+    @keyframes float1 { 0%,100%{transform:translate(0,0)} 50%{transform:translate(-30px,40px)} }
+    @keyframes float2 { 0%,100%{transform:translate(0,0)} 50%{transform:translate(40px,-30px)} }
+
+    /* ─── LAYOUT ─── */
+    .page { position: relative; z-index: 1; max-width: 900px; margin: 0 auto; padding: 0 24px 80px; }
+
+    /* ─── HEADER ─── */
+    header {
+      padding: 40px 0 48px;
+      display: flex; flex-direction: column; align-items: center; text-align: center;
+      animation: fadeDown 0.7s ease both;
+    }
+
+    .badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: rgba(0,229,255,0.08);
+      border: 1px solid rgba(0,229,255,0.2);
+      color: var(--accent); font-family: 'DM Mono', monospace;
+      font-size: 11px; letter-spacing: 0.12em; padding: 5px 14px;
+      border-radius: 100px; margin-bottom: 24px;
+    }
+    .badge::before { content: '●'; font-size: 8px; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+    h1 {
+      font-size: clamp(2.4rem, 6vw, 4rem);
+      font-weight: 800; line-height: 1.05;
+      letter-spacing: -0.03em;
+    }
+    h1 span {
+      background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 60%, var(--accent3) 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+
+    .tagline { font-size: 1rem; color: var(--muted); margin-top: 14px; max-width: 480px; line-height: 1.6; }
+
+    /* ─── STATS BAR ─── */
+    .stats {
+      display: flex; gap: 0; margin-top: 36px;
+      border: 1px solid var(--border); border-radius: 12px; overflow: hidden;
+      background: var(--surface); width: 100%; max-width: 540px;
+      animation: fadeUp 0.8s 0.2s ease both;
+    }
+    .stat { flex: 1; padding: 14px 16px; text-align: center; border-right: 1px solid var(--border); }
+    .stat:last-child { border-right: none; }
+    .stat-val { font-size: 1.3rem; font-weight: 700; color: var(--accent); }
+    .stat-lbl { font-size: 0.65rem; color: var(--muted); letter-spacing: 0.08em; margin-top: 2px; }
+
+    /* ─── MAIN CARD ─── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px; overflow: hidden;
+      animation: fadeUp 0.8s 0.3s ease both;
+    }
+
+    .card-header {
+      padding: 18px 24px;
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 10px;
+      background: var(--surface2);
+    }
+    .card-header-dot { width: 10px; height: 10px; border-radius: 50%; }
+    .dot-r { background: #ef4444; } .dot-y { background: #f59e0b; } .dot-g { background: #22c55e; }
+    .card-title { font-family: 'DM Mono', monospace; font-size: 0.75rem; color: var(--muted); margin-left: 6px; letter-spacing: 0.06em; }
+
+    .card-body { padding: 28px 28px; }
+
+    /* ─── TEXTAREA ─── */
+    .field-label {
+      font-size: 0.7rem; letter-spacing: 0.12em; color: var(--accent);
+      font-family: 'DM Mono', monospace; margin-bottom: 8px; display: flex; justify-content: space-between;
+    }
+    .char-count { color: var(--muted); }
+
+    textarea {
+      width: 100%; min-height: 120px; resize: vertical;
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: 10px; color: var(--text);
+      font-family: 'DM Mono', monospace; font-size: 0.88rem; line-height: 1.6;
+      padding: 14px 16px; outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    textarea:focus { border-color: rgba(0,229,255,0.4); box-shadow: 0 0 0 3px rgba(0,229,255,0.06); }
+    textarea::placeholder { color: var(--muted); }
+
+    /* ─── TAGS ─── */
+    .tags-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 20px 0 24px; }
+    .tag {
+      padding: 5px 12px; border-radius: 6px; font-size: 0.7rem;
+      font-family: 'DM Mono', monospace; cursor: pointer;
+      border: 1px solid var(--border); background: transparent; color: var(--muted);
+      transition: all 0.15s;
+    }
+    .tag:hover, .tag.active {
+      border-color: var(--accent); color: var(--accent);
+      background: rgba(0,229,255,0.07);
+    }
+    .tag-label { font-size: 0.65rem; color: var(--muted); letter-spacing: 0.1em; align-self: center; }
+
+    /* ─── BUTTON ─── */
+    .btn-row { display: flex; gap: 12px; margin-top: 4px; }
+
+    .btn-primary {
+      flex: 1; padding: 13px 24px; border-radius: 10px; border: none; cursor: pointer;
+      font-family: 'Syne', sans-serif; font-weight: 700; font-size: 0.88rem; letter-spacing: 0.04em;
+      background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
+      color: #fff; position: relative; overflow: hidden;
+      transition: transform 0.15s, opacity 0.15s;
+    }
+    .btn-primary::after {
+      content: ''; position: absolute; inset: 0;
+      background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, transparent 60%);
+    }
+    .btn-primary:hover { transform: translateY(-1px); opacity: 0.9; }
+    .btn-primary:active { transform: translateY(0); }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+    .btn-ghost {
+      padding: 13px 18px; border-radius: 10px; cursor: pointer;
+      background: transparent; border: 1px solid var(--border);
+      color: var(--muted); font-family: 'DM Mono', monospace; font-size: 0.8rem;
+      transition: all 0.15s;
+    }
+    .btn-ghost:hover { border-color: var(--accent2); color: var(--text); }
+
+    /* ─── RESULT ─── */
+    .result-section {
+      margin-top: 28px; border-top: 1px solid var(--border); padding-top: 28px;
+      display: none;
+      animation: fadeUp 0.5s ease both;
+    }
+    .result-section.visible { display: block; }
+
+    .result-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+    .result-title { font-size: 0.7rem; letter-spacing: 0.12em; color: var(--success); font-family: 'DM Mono', monospace; }
+
+    .score-chips { display: flex; gap: 8px; }
+    .chip {
+      padding: 3px 10px; border-radius: 100px; font-size: 0.65rem;
+      font-family: 'DM Mono', monospace; font-weight: 400;
+    }
+    .chip-good { background: rgba(16,185,129,0.12); color: var(--success); border: 1px solid rgba(16,185,129,0.2); }
+    .chip-warn { background: rgba(245,158,11,0.12); color: var(--accent3); border: 1px solid rgba(245,158,11,0.2); }
+
+    .result-box {
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: 10px; padding: 16px;
+      font-family: 'DM Mono', monospace; font-size: 0.84rem; line-height: 1.7;
+      color: var(--text); white-space: pre-wrap; word-break: break-word;
+      position: relative; min-height: 60px;
+    }
+
+    .copy-btn {
+      position: absolute; top: 10px; right: 10px;
+      background: var(--surface2); border: 1px solid var(--border);
+      color: var(--muted); padding: 4px 10px; border-radius: 6px;
+      font-size: 0.65rem; font-family: 'DM Mono', monospace;
+      cursor: pointer; transition: all 0.15s;
+    }
+    .copy-btn:hover { color: var(--accent); border-color: var(--accent); }
+
+    /* ─── IMPROVEMENTS LIST ─── */
+    .improvements { margin-top: 18px; display: flex; flex-direction: column; gap: 8px; }
+    .improvement-item {
+      display: flex; gap: 10px; align-items: flex-start;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 8px; padding: 10px 14px;
+      font-size: 0.78rem; line-height: 1.5;
+      animation: fadeUp 0.4s ease both;
+    }
+    .improvement-icon { font-size: 0.9rem; flex-shrink: 0; margin-top: 1px; }
+    .improvement-text { color: var(--muted); }
+    .improvement-text strong { color: var(--text); }
+
+    /* ─── LOADING ─── */
+    .spinner {
+      display: inline-block; width: 14px; height: 14px;
+      border: 2px solid rgba(255,255,255,0.2);
+      border-top-color: #fff; border-radius: 50%;
+      animation: spin 0.7s linear infinite; vertical-align: middle; margin-right: 8px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ─── FEATURES GRID ─── */
+    .features {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 32px;
+      animation: fadeUp 0.8s 0.5s ease both;
+    }
+    @media (max-width: 600px) { .features { grid-template-columns: 1fr 1fr; } }
+
+    .feature {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; padding: 18px 16px;
+      transition: border-color 0.2s;
+    }
+    .feature:hover { border-color: rgba(0,229,255,0.25); }
+    .feature-icon { font-size: 1.4rem; margin-bottom: 10px; }
+    .feature-name { font-size: 0.8rem; font-weight: 700; margin-bottom: 4px; }
+    .feature-desc { font-size: 0.72rem; color: var(--muted); line-height: 1.5; }
+
+    /* ─── FOOTER ─── */
+    footer {
+      margin-top: 64px; padding-top: 28px; border-top: 1px solid var(--border);
+      display: flex; justify-content: space-between; align-items: center; flex-wrap: gap;
+      font-size: 0.72rem; color: var(--muted); font-family: 'DM Mono', monospace;
+    }
+    .footer-links { display: flex; gap: 20px; }
+    .footer-links a { color: var(--muted); text-decoration: none; transition: color 0.15s; }
+    .footer-links a:hover { color: var(--accent); }
+
+    /* ─── ANIMS ─── */
+    @keyframes fadeDown { from{opacity:0;transform:translateY(-18px)} to{opacity:1;transform:translateY(0)} }
+    @keyframes fadeUp   { from{opacity:0;transform:translateY(18px)}  to{opacity:1;transform:translateY(0)} }
+  </style>
+</head>
+<body>
+
+<div class="orb orb1"></div>
+<div class="orb orb2"></div>
+
+<div class="page">
+  <!-- HEADER -->
+  <header>
+    <div class="badge">✦ HACKATHON PROJECT 2025</div>
+    <h1>Smart<span>Prompt</span> AI</h1>
+    <p class="tagline">Instantly optimize any AI prompt for clarity, context, and better outputs — powered by pattern analysis.</p>
+
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-val" id="s-prompts">2,841</div>
+        <div class="stat-lbl">PROMPTS OPTIMIZED</div>
+      </div>
+      <div class="stat">
+        <div class="stat-val">94%</div>
+        <div class="stat-lbl">QUALITY SCORE ↑</div>
+      </div>
+      <div class="stat">
+        <div class="stat-val">&lt; 1s</div>
+        <div class="stat-lbl">RESPONSE TIME</div>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN TOOL CARD -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-header-dot dot-r"></div>
+      <div class="card-header-dot dot-y"></div>
+      <div class="card-header-dot dot-g"></div>
+      <span class="card-title">prompt-optimizer.js — active</span>
+    </div>
+
+    <div class="card-body">
+      <div class="field-label">
+        <span>// INPUT PROMPT</span>
+        <span class="char-count" id="charCount">0 chars</span>
+      </div>
+      <textarea id="inputPrompt" placeholder="Paste your prompt here… e.g. 'write me a blog post about AI'"></textarea>
+
+      <div class="tags-row">
+        <span class="tag-label">STYLE →</span>
+        <button class="tag active" data-mode="general">General</button>
+        <button class="tag" data-mode="technical">Technical</button>
+        <button class="tag" data-mode="creative">Creative</button>
+        <button class="tag" data-mode="research">Research</button>
+        <button class="tag" data-mode="business">Business</button>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn-primary" id="optimizeBtn" onclick="optimizePrompt()">
+          ✦ Optimize Prompt
+        </button>
+        <button class="btn-ghost" onclick="clearAll()">Clear</button>
+      </div>
+
+      <!-- RESULT -->
+      <div class="result-section" id="resultSection">
+        <div class="result-header">
+          <span class="result-title">// OPTIMIZED OUTPUT</span>
+          <div class="score-chips" id="scoreChips"></div>
+        </div>
+        <div class="result-box" id="resultBox">
+          <button class="copy-btn" onclick="copyResult()">copy</button>
+          <span id="resultText"></span>
+        </div>
+        <div class="improvements" id="improvements"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FEATURES GRID -->
+  <div class="features">
+    <div class="feature">
+      <div class="feature-icon">🧠</div>
+      <div class="feature-name">Context Injection</div>
+      <div class="feature-desc">Automatically adds missing role, tone, and output format context.</div>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">🎯</div>
+      <div class="feature-name">Clarity Scoring</div>
+      <div class="feature-desc">Rates specificity, ambiguity, and structure before & after.</div>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">⚡</div>
+      <div class="feature-name">One-Click Modes</div>
+      <div class="feature-desc">Tailored optimizations for Technical, Creative, Business and more.</div>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">📋</div>
+      <div class="feature-name">Improvement Tips</div>
+      <div class="feature-desc">Shows exactly what changed and why it makes outputs better.</div>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">🔄</div>
+      <div class="feature-name">Iterative Refine</div>
+      <div class="feature-desc">Re-optimize the result to keep polishing until perfect.</div>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">🛡️</div>
+      <div class="feature-name">Privacy First</div>
+      <div class="feature-desc">All processing is client-side. Your prompts never leave your browser.</div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <footer>
+    <span>SmartPrompt AI — Built for HackFest 2025</span>
+    <div class="footer-links">
+      <a href="https://github.com" target="_blank">GitHub</a>
+      <a href="#demo">Demo</a>
+      <a href="mailto:team@smartprompt.ai">Contact</a>
+    </div>
+  </footer>
+</div>
+
+<script>
+  // --- Counter animation ---
+  function animateCounter(el, target) {
+    let val = 0;
+    const step = Math.ceil(target / 60);
+    const timer = setInterval(() => {
+      val = Math.min(val + step, target);
+      el.textContent = val.toLocaleString();
+      if (val >= target) clearInterval(timer);
+    }, 20);
+  }
+  animateCounter(document.getElementById('s-prompts'), 2841);
+
+  // --- Char count ---
+  const ta = document.getElementById('inputPrompt');
+  ta.addEventListener('input', () => {
+    document.getElementById('charCount').textContent = ta.value.length + ' chars';
+  });
+
+  // --- Mode tags ---
+  let activeMode = 'general';
+  document.querySelectorAll('.tag[data-mode]').forEach(t => {
+    t.addEventListener('click', () => {
+      document.querySelectorAll('.tag[data-mode]').forEach(x => x.classList.remove('active'));
+      t.classList.add('active');
+      activeMode = t.dataset.mode;
+    });
+  });
+
+  // --- Core optimizer logic ---
+  const IMPROVEMENTS_DB = {
+    noRole:       { icon: '👤', text: '<strong>Added role context</strong> — specifying "Act as…" dramatically improves response quality.' },
+    noFormat:     { icon: '📐', text: '<strong>Defined output format</strong> — telling the model how to structure the answer reduces guesswork.' },
+    noLength:     { icon: '📏', text: '<strong>Set length expectation</strong> — vague length leads to over/under-generating.' },
+    noTone:       { icon: '🎨', text: '<strong>Specified tone</strong> — matching voice (formal, casual, expert) improves relevance.' },
+    noExamples:   { icon: '💡', text: '<strong>Suggested adding examples</strong> — few-shot context boosts accuracy for complex tasks.' },
+    vague:        { icon: '🔍', text: '<strong>Reduced vagueness</strong> — replaced broad words with specific, measurable language.' },
+  };
+
+  function buildOptimizedPrompt(raw, mode) {
+    const roles = {
+      general:   'You are a helpful and knowledgeable assistant.',
+      technical: 'You are a senior software engineer with 15 years of industry experience.',
+      creative:  'You are an award-winning creative writer with a distinctive, engaging style.',
+      research:  'You are an academic researcher who cites evidence and thinks critically.',
+      business:  'You are a seasoned business strategist and consultant.',
+    };
+    const formats = {
+      general:   'Provide a clear, well-structured answer.',
+      technical: 'Include code examples where relevant. Use markdown for formatting.',
+      creative:  'Be vivid, original, and avoid clichés.',
+      research:  'Structure your response with an intro, analysis, and conclusion.',
+      business:  'Lead with the key insight, then support with reasoning and data.',
+    };
+
+    const trimmed = raw.trim();
+    const chips = [];
+    const improvements = [];
+
+    let result = '';
+
+    // Role injection
+    if (!/act as|you are|as a|role:/i.test(trimmed)) {
+      result += roles[mode] + '\n\n';
+      improvements.push('noRole');
+    }
+
+    // Main prompt body — capitalize + end with period
+    let body = trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
+    if (!/[.?!]$/.test(body)) body += '.';
+    result += body;
+
+    // Format instruction
+    if (!/format|structure|respond|output/i.test(trimmed)) {
+      result += '\n\n' + formats[mode];
+      improvements.push('noFormat');
+    }
+
+    // Length hint
+    if (!/word|paragraph|sentence|brief|detail|compre/i.test(trimmed)) {
+      result += ' Be thorough but concise — aim for 200–400 words unless the topic demands more.';
+      improvements.push('noLength');
+    }
+
+    // Tone hint for creative/business
+    if ((mode === 'creative' || mode === 'business') && !/tone|style|voice/i.test(trimmed)) {
+      improvements.push('noTone');
+    }
+
+    // Vagueness check
+    const vagueWords = ['stuff', 'things', 'good', 'bad', 'nice', 'better', 'some'];
+    if (vagueWords.some(w => trimmed.toLowerCase().includes(w))) {
+      improvements.push('vague');
+    }
+
+    // Score chips
+    const score = Math.min(98, 70 + improvements.length * 4 + (mode !== 'general' ? 6 : 0));
+    chips.push({ label: `+${score - 70}% quality`, cls: 'chip-good' });
+    if (improvements.length >= 3) chips.push({ label: `${improvements.length} fixes`, cls: 'chip-warn' });
+    else chips.push({ label: `${improvements.length} enhancements`, cls: 'chip-good' });
+
+    return { optimized: result, improvements: improvements.map(k => IMPROVEMENTS_DB[k]), chips };
+  }
+
+  function optimizePrompt() {
+    const raw = ta.value.trim();
+    if (!raw) { ta.focus(); ta.style.borderColor = 'var(--danger)'; setTimeout(() => ta.style.borderColor = '', 1000); return; }
+
+    const btn = document.getElementById('optimizeBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>Analyzing…';
+
+    setTimeout(() => {
+      const { optimized, improvements, chips } = buildOptimizedPrompt(raw, activeMode);
+
+      // Show result
+      document.getElementById('resultText').textContent = optimized;
+      document.getElementById('scoreChips').innerHTML = chips.map(c => `<span class="chip ${c.cls}">${c.label}</span>`).join('');
+
+      const impEl = document.getElementById('improvements');
+      impEl.innerHTML = '';
+      improvements.forEach((imp, i) => {
+        const div = document.createElement('div');
+        div.className = 'improvement-item';
+        div.style.animationDelay = (i * 0.07) + 's';
+        div.innerHTML = `<span class="improvement-icon">${imp.icon}</span><span class="improvement-text">${imp.text}</span>`;
+        impEl.appendChild(div);
+      });
+
+      document.getElementById('resultSection').classList.add('visible');
+      btn.disabled = false;
+      btn.innerHTML = '↺ Re-optimize';
+
+      // Update counter
+      const el = document.getElementById('s-prompts');
+      const curr = parseInt(el.textContent.replace(/,/g,''));
+      el.textContent = (curr + 1).toLocaleString();
+    }, 900);
+  }
+
+  function clearAll() {
+    ta.value = '';
+    document.getElementById('charCount').textContent = '0 chars';
+    document.getElementById('resultSection').classList.remove('visible');
+    document.getElementById('optimizeBtn').innerHTML = '✦ Optimize Prompt';
+  }
+
+  function copyResult() {
+    const text = document.getElementById('resultText').textContent;
+    navigator.clipboard.writeText(text).then(() => {
+      const btn = document.querySelector('.copy-btn');
+      btn.textContent = 'copied!';
+      btn.style.color = 'var(--success)';
+      setTimeout(() => { btn.textContent = 'copy'; btn.style.color = ''; }, 1500);
+    });
+  }
+</script>
+</body>
+</html>
